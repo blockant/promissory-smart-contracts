@@ -104,13 +104,7 @@ contract Promissory{
     /// @param _USDT address of USDT token
     /// @param _PROM address of 
     /// @param _feesRegistry address of 
-    constructor(
-        address _promissoryOwner,
-        address _USDT,
-        address _PROM,
-        address _feesRegistry
-    )
-    {
+    constructor(address _promissoryOwner,address _USDT,address _PROM,address _feesRegistry){
         //confirming that no one can bypass using null
         require(_promissoryOwner != address(0), "Zero(0x0) Promissory Owner address");
         require(_USDT != address(0), "Zero(0x0) USDT address");
