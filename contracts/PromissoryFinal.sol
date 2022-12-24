@@ -102,9 +102,14 @@ contract Promissory{
     /// @dev Property name array
     Property[] public properties;
 
-    //Counters for assigning and updating propertyId
+    /// @dev Counters for assigning and updating propertyId
     using Counters for Counters.Counter;
     Counters.Counter private _propertyId;
+
+    /*//////////////////////////////////////////////////////////////
+                                MAPPING
+    //////////////////////////////////////////////////////////////*/
+    mapping (uint256 => address) public tokenIdToOwner;
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -189,6 +194,8 @@ contract Promissory{
             properties[propertyId].tokenSymbol,
             properties[propertyId].tokenSupply
         );
+
+        tokenIdToOwner[propertyId] = address(t);
 
         // properties[propertyId].propertyTokenAddress = address(t);
 
