@@ -46,9 +46,9 @@ contract Promissory{
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PropertyAdded(uint256 PropertyId, address PropertyOwner, uint256 PropertyTokenSupply, string PropertyTokenName, string PropertyTokenSymbol,  uint256 PropertyInterestRate, uint256 PropertyLockingPeriod);
-    event PropertyBanned(address promissoryOwner, uint256 propertyId, address owner);
-    event PropertyApprovedAndTokenized(uint256 propertyId, address promissoryOwner, address propertyOwner, uint256 tokenSupply, address propertyTokenAddress);
+    event PropertyAdded(uint256 indexed PropertyId, address indexed PropertyOwner, string PropertyTokenName, string PropertyTokenSymbol, uint256 PropertyTokenSupply, uint256 PropertyInterestRate, uint256 PropertyLockingPeriod);
+    event PropertyBanned(uint256 indexed PropertyId, address indexed PropertyOwner);
+    event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress);
     // event PropertyTokensReleased(uint256 propertyId, address owner, uint256 tokenSupply);
     // event TokensClaimed(address investor, uint256 propertyId, uint256 tokensToClaim);
     // event Invested(uint256 propertyId, address investor, uint256 investmentAmount, uint256 tokenSupply, uint256 interestRate);
@@ -88,19 +88,14 @@ contract Promissory{
     /// @param PropertyStatus is the status of a property with the help of enum
     struct Property{
         uint256 propertyId;
-        address owner;
-        uint256 tokenSupply;
         string tokenName;
-        string tokenSymbol; 
+        string tokenSymbol;
+        uint256 tokenSupply; 
         uint256 interestRate; //handle 2 decimal points (1000)
         uint256 lockingPeriod;//locking period
-        bool isBanned;
-        // address propertyTokenAddress;
+        address propertyTokenAddress;
         PropertyStatus status;
     }
-
-    /// @dev Property name array
-    Property[] public properties;
 
     /// @dev Counters for assigning and updating propertyId
     using Counters for Counters.Counter;
@@ -109,7 +104,10 @@ contract Promissory{
     /*//////////////////////////////////////////////////////////////
                                 MAPPING
     //////////////////////////////////////////////////////////////*/
-    mapping (uint256 => address) public tokenIdToOwner;
+    
+    mapping (uint256 => address) public propertyIdToOwner;//propertyId to owner mapping
+    mapping (uint256 => Property) public propertyIdToProperty;//propertyId to struct Property mapping
+    mapping (uint256 => address) public propertyIdToTokenAddress;//propertyId to property token address
 
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -139,66 +137,63 @@ contract Promissory{
     }
 
     /// @notice creates a new property
-    function addProperty(Property memory propertyDetails) external
+    function addProperty(
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        uint256 _tokenSupply,
+        uint256 _interestRate,
+        uint256 _lockingPeriod
+    ) external
 
-    {
-        require(propertyDetails.owner != address(0), "Owner address can't be empty or zero(0x0) address");
-
-        uint256 propertyId = _propertyId.current();
+    {   
+        Property memory userProperty;
+        userProperty.propertyId = _propertyId.current();
         _propertyId.increment();
-        // Create Property and add property details
-        //uint256 propertyId = properties.length;
-        properties.push();
-        properties[propertyId].owner = propertyDetails.owner;
-        properties[propertyId].tokenSupply = propertyDetails.tokenSupply;
-        properties[propertyId].tokenName = propertyDetails.tokenName;
-        properties[propertyId].tokenSymbol = propertyDetails.tokenSymbol;
-        properties[propertyId].interestRate = propertyDetails.interestRate;
-        properties[propertyId].lockingPeriod = propertyDetails.lockingPeriod;
+        propertyIdToOwner[userProperty.propertyId] = msg.sender;
+        userProperty.tokenName = _tokenName;
+        userProperty.tokenSymbol = _tokenSymbol;
+        userProperty.tokenSupply = _tokenSupply;
+        userProperty.interestRate = _interestRate;
+        userProperty.lockingPeriod = _lockingPeriod;
 
-        properties[propertyId].status = PropertyStatus.ADDED;
+        userProperty.status = PropertyStatus.ADDED;
+        propertyIdToProperty[userProperty.propertyId] = userProperty;
 
         emit PropertyAdded(
-            propertyId,
-            propertyDetails.owner,
-            propertyDetails.tokenSupply,
-            propertyDetails.tokenName,
-            propertyDetails.tokenSymbol,
-            propertyDetails.interestRate,
-            propertyDetails.lockingPeriod
+            userProperty.propertyId,
+            msg.sender,
+            userProperty.tokenName,
+            userProperty.tokenSymbol,
+            userProperty.tokenSupply,
+            userProperty.interestRate,
+            userProperty.lockingPeriod
         );
 
     }
 
     /// @notice owner of the platform can ban a property
     function banProperty(uint256 propertyId) external checkPromissoryOwner() {
-        // ban Property
-        properties[propertyId].isBanned = true;
-        properties[propertyId].status = PropertyStatus.BANNED;
 
-        emit PropertyBanned(msg.sender, propertyId, properties[propertyId].owner);
-    }
+        propertyIdToProperty[propertyId].status = PropertyStatus.BANNED;
 
-    /// @notice getter function for the status of a property
-    function getPropertyStatus(uint256 propertyId) public view returns (PropertyStatus) {
-        return properties[propertyId].status;
+        emit PropertyBanned(propertyId, propertyIdToOwner[propertyId]);
     }
 
     /// @notice owner of the platform will approve a property and it'll be tokenized
     function approveProperty(uint256 propertyId) external checkPromissoryOwner() {
 
-        require(!properties[propertyId].isBanned, "Property already banned");
+        require(propertyIdToProperty[propertyId].status == PropertyStatus.BANNED, "Property already banned");
 
         ERC20Token t = new ERC20Token(
-            properties[propertyId].tokenName,
-            properties[propertyId].tokenSymbol,
-            properties[propertyId].tokenSupply
+            propertyIdToProperty[propertyId].tokenName,
+            propertyIdToProperty[propertyId].tokenSymbol,
+            propertyIdToProperty[propertyId].tokenSupply
         );
 
-        tokenIdToOwner[propertyId] = address(t);
+        propertyIdToProperty[propertyId].propertyTokenAddress = address(t);
 
-        // properties[propertyId].propertyTokenAddress = address(t);
+        propertyIdToTokenAddress[propertyId] = address(t);
 
-        emit PropertyApprovedAndTokenized(propertyId, msg.sender, properties[propertyId].owner, properties[propertyId].tokenSupply, address(t));
+        emit PropertyApprovedAndTokenized(propertyId, propertyIdToOwner[propertyId], propertyIdToProperty[propertyId].tokenName, propertyIdToProperty[propertyId].tokenSymbol, propertyIdToProperty[propertyId].tokenSupply, address(t));
     }
 }
