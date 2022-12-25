@@ -54,7 +54,7 @@ contract Promissory{
     // event Invested(uint256 propertyId, address investor, uint256 investmentAmount, uint256 tokenSupply, uint256 interestRate);
     // event InvestmentReleased(address investor, uint256 propertyId, uint256 investmentAmount);
     // event InvestmentClaimed(address owner, uint256 propertyId, uint256 investmentToClaim);
-    // event InterestRateUpdated(uint256 propertyId, uint256 interestRate);
+    event InterestRateUpdated(uint256 propertyId, uint256 interestRate);
 
     /// @dev An enum for representing whether a property is
     /// @param Pending when nothing happend
@@ -93,9 +93,11 @@ contract Promissory{
         uint256 tokenSupply; 
         uint256 interestRate; //handle 2 decimal points (1000)
         uint256 lockingPeriod;//locking period
-        address propertyTokenAddress;
         PropertyStatus status;
     }
+
+    //An array of 'Property' struct
+    Property[] public property;
 
     /// @dev Counters for assigning and updating propertyId
     using Counters for Counters.Counter;
@@ -159,6 +161,16 @@ contract Promissory{
         userProperty.status = PropertyStatus.ADDED;
         propertyIdToProperty[userProperty.propertyId] = userProperty;
 
+        property.push(Property(
+            userProperty.propertyId,
+            userProperty.tokenName,
+            userProperty.tokenSymbol,
+            userProperty.tokenSupply,
+            userProperty.interestRate,
+            userProperty.lockingPeriod,
+            userProperty.status
+        ));
+
         emit PropertyAdded(
             userProperty.propertyId,
             msg.sender,
@@ -170,6 +182,29 @@ contract Promissory{
         );
 
     }
+
+    // getter function to get properties by index
+    //solidity automatically creates a getter for 'property' so
+    //we don't actually need this function
+    // function getProperties(uint _index) public view returns (
+    //     uint256 propertyId,
+    //     string calldata tokenName,
+    //     string calldata tokenSymbol,
+    //     uint256 tokenSupply,
+    //     uint256 interestRate,
+    //     uint256 lockingPeriod,
+    //     uint status) {
+    //     Property storage propertiesDetails = property[_index];
+    //     return (
+    //     propertiesDetails.propertyId,
+    //     propertiesDetails.tokenName,
+    //     propertiesDetails.tokenSymbol,
+    //     propertiesDetails.tokenSupply,
+    //     propertiesDetails.interestRate,
+    //     propertiesDetails.lockingPeriod,
+    //     propertiesDetails.status
+    //     );
+    // }
 
     /// @notice owner of the platform can ban a property
     function banProperty(uint256 propertyId) external checkPromissoryOwner() {
@@ -190,10 +225,20 @@ contract Promissory{
             propertyIdToProperty[propertyId].tokenSupply
         );
 
-        propertyIdToProperty[propertyId].propertyTokenAddress = address(t);
-
         propertyIdToTokenAddress[propertyId] = address(t);
 
+        propertyIdToProperty[propertyId].status = PropertyStatus.APPROVED;
+
         emit PropertyApprovedAndTokenized(propertyId, propertyIdToOwner[propertyId], propertyIdToProperty[propertyId].tokenName, propertyIdToProperty[propertyId].tokenSymbol, propertyIdToProperty[propertyId].tokenSupply, address(t));
+    }
+
+    /// @notice owner of the platform can update the interest rate of a property
+    function updateInterestRate(uint propertyId, uint256 _interestRate) external checkPromissoryOwner(){
+        
+        require(propertyIdToProperty[propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
+
+        propertyIdToProperty[propertyId].interestRate = _interestRate;
+
+        emit InterestRateUpdated(propertyId, _interestRate);
     }
 }
