@@ -91,7 +91,7 @@ contract Promissory{
         string tokenSymbol;
         uint256 tokenSupply; 
         uint256 interestRate; //handle 2 decimal points (1000)
-        uint256 lockingPeriod;//locking period
+        uint256 lockingPeriod;
         PropertyStatus status;
     }
 
@@ -265,6 +265,9 @@ contract Promissory{
         
         IERC20(USDT).transferFrom(msg.sender, address(this), investmentAmount);
         investedAmount[propertyId] += investmentAmount;
+
+        ERC20Token(propertyIdToTokenAddress[propertyId]).transfer(msg.sender, investmentAmount);
+        lockedTokens[propertyId] -= investmentAmount;
 
         emit Invested(propertyId, msg.sender, investmentAmount, propertyIdToProperty[propertyId].tokenSupply, propertyIdToProperty[propertyId].interestRate);
     }
