@@ -50,11 +50,9 @@ contract Promissory{
     event PropertyBanned(uint256 indexed PropertyId, address indexed PropertyOwner);
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
-    //event PropertyTokensReleased(uint256 indexed PropertyId, address indexed Owner, uint256 indexed TokenSupply, address TokenAddress);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
     // event TokensClaimed(address investor, uint256 propertyId, uint256 tokensToClaim);
-    // event InvestmentReleased(address investor, uint256 propertyId, uint256 investmentAmount);
-    // event InvestmentClaimed(address owner, uint256 propertyId, uint256 investmentToClaim);
+    event InvestmentClaimed(address indexed Owner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
 
     /// @dev An enum for representing whether a property is
     /// @param Pending when nothing happend
@@ -112,6 +110,7 @@ contract Promissory{
     mapping (uint256 => address) public propertyIdToTokenAddress;//propertyId to property token address
     mapping (uint256 => uint256) public lockedTokens;//propertyId to numberOfTokens that has been locked in the smart contract of that propertyId
     mapping (uint256 => uint256) public investedAmount;//invested amount in a property
+    mapping (uint256 => uint256) public claimedInvestment;//claimed amount by owner of property
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -268,6 +267,19 @@ contract Promissory{
         investedAmount[propertyId] += investmentAmount;
 
         emit Invested(propertyId, msg.sender, investmentAmount, propertyIdToProperty[propertyId].tokenSupply, propertyIdToProperty[propertyId].interestRate);
+    }
+
+    /// @notice Property owners can claim the investment that has been invested in thier property up until now
+    function claimInvestment(uint256 propertyId, uint256 numberOfTokensToClaim) external {
+
+        require(msg.sender != propertyIdToProperty[propertyId].owner, "You are not the onwer of this property!");
+        require(numberOfTokensToClaim <= investedAmount[propertyId] , "Amount exceeds than available!");
+
+        IERC20(USDT).transferFrom(address(this), propertyIdToProperty[propertyId].owner, numberOfTokensToClaim);
+
+        claimedInvestment[propertyId] += numberOfTokensToClaim;
+
+        emit InvestmentClaimed(msg.sender, propertyId, numberOfTokensToClaim);
     }
 
 }
