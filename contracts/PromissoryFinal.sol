@@ -262,6 +262,7 @@ contract Promissory{
     function investInProperty(uint256 propertyId, uint256 investmentAmount) external {
 
         require(propertyIdToProperty[propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!, Wait for platform to approve this property.");
+        require(investmentAmount <= lockedTokens[propertyId], "Invested Amount exceeds the number of Property Tokens available");
         
         IERC20(USDT).transferFrom(msg.sender, address(this), investmentAmount);
         investedAmount[propertyId] += investmentAmount;
