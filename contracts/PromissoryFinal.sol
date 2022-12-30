@@ -54,7 +54,7 @@ contract Promissory{
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
-    event LoanClaimed(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
+    event ClaimedLoan(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
     event ReturnedLoan(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
     event ClaimedInvestment(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
     event ClaimedPropertyTokens(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedTokens);
@@ -105,7 +105,7 @@ contract Promissory{
 
     /// @dev Counters for assigning and updating propertyId
     using Counters for Counters.Counter;
-    Counters.Counter private _propertyIdCount;
+    Counters.Counter public _propertyIdCount;
 
     // Struct for storing investment information
     struct Investment {
@@ -278,7 +278,7 @@ contract Promissory{
 
         claimedLoan[_propertyId] += _numberOfTokensToClaim;
 
-        emit LoanClaimed(msg.sender, _propertyId, _numberOfTokensToClaim);
+        emit ClaimedLoan(msg.sender, _propertyId, _numberOfTokensToClaim);
     }
 
     /// @notice Property owner have to return loan with interest to the smart contract
