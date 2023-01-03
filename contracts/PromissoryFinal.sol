@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 // import "./IERC20.sol";
 import "./ERC20Token.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 /// @dev Followed Promissory Product Summary.pdf
 
@@ -31,6 +32,8 @@ In return, they will get crypto tokens from property owners.
 */
 
 contract Promissory{
+    //using the SafeMath library
+    using SafeMath for uint256;
 
     /*//////////////////////////////////////////////////////////////
                                 ADDRESSES
@@ -51,8 +54,10 @@ contract Promissory{
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
-    // event TokensClaimed(address investor, uint256 propertyId, uint256 tokensToClaim);
-    event InvestmentClaimed(address indexed Owner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
+    event ClaimedLoan(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
+    event ReturnedLoan(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
+    event ClaimedInvestment(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
+    event ClaimedPropertyTokens(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedTokens);
 
     /// @dev An enum for representing whether a property is
     /// @param Pending when nothing happend
@@ -100,17 +105,25 @@ contract Promissory{
 
     /// @dev Counters for assigning and updating propertyId
     using Counters for Counters.Counter;
-    Counters.Counter private _propertyId;
+    Counters.Counter public _propertyIdCount;
+
+    // Struct for storing investment information
+    struct Investment {
+        address investor;
+        uint256 investmentAmount;
+        uint256 timeStamp;
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 MAPPING
     //////////////////////////////////////////////////////////////*/
     
-    mapping (uint256 => Property) public propertyIdToProperty;//propertyId to struct Property mapping
-    mapping (uint256 => address) public propertyIdToTokenAddress;//propertyId to property token address
-    mapping (uint256 => uint256) public lockedTokens;//propertyId to numberOfTokens that has been locked in the smart contract of that propertyId
-    mapping (uint256 => uint256) public investedAmount;//invested amount in a property
-    mapping (uint256 => uint256) public claimedInvestment;//claimed amount by owner of property
+    mapping (uint256 => Property) public propertyIdToProperty;// Mapping for storing property details with propertyId
+    mapping (uint256 => address) public propertyIdToTokenAddress;// propertyId to property token address
+    mapping (uint256 => uint256) public lockedTokens;// propertyId to numberOfTokens that has been locked in the smart contract of that propertyId
+    mapping (uint256 => uint256) public totalInvestedAmount;// invested amount in a property
+    mapping (uint256 => uint256) public claimedLoan;// claimed loan amount by owner of property
+    mapping (uint256 => mapping (address => Investment)) public investments;// Mapping for storing investment information with tokenID and invetsor address
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -149,13 +162,13 @@ contract Promissory{
 
     {   
         Property memory userProperty;
-        userProperty.propertyId = _propertyId.current();
-        _propertyId.increment();
+        userProperty.propertyId = _propertyIdCount.current();
+        _propertyIdCount.increment();
         userProperty.owner = msg.sender;
         userProperty.tokenName = _tokenName;
         userProperty.tokenSymbol = _tokenSymbol;
         userProperty.tokenSupply = _tokenSupply;
-        userProperty.interestRate = _interestRate;
+        userProperty.interestRate = _interestRate * 100;//handling two decimal points
         userProperty.lockingPeriod = _lockingPeriod;
 
         userProperty.status = PropertyStatus.ADDED;
@@ -184,105 +197,128 @@ contract Promissory{
 
     }
 
-    // getter function to get properties by index
-    //solidity automatically creates a getter for 'property' so
-    //we don't actually need this function
-    // function getProperties(uint _index) public view returns (
-    //     uint256 propertyId,
-    //     string calldata tokenName,
-    //     string calldata tokenSymbol,
-    //     uint256 tokenSupply,
-    //     uint256 interestRate,
-    //     uint256 lockingPeriod,
-    //     uint status) {
-    //     Property storage propertiesDetails = property[_index];
-    //     return (
-    //     propertiesDetails.propertyId,
-    //     propertiesDetails.tokenName,
-    //     propertiesDetails.tokenSymbol,
-    //     propertiesDetails.tokenSupply,
-    //     propertiesDetails.interestRate,
-    //     propertiesDetails.lockingPeriod,
-    //     propertiesDetails.status
-    //     );
-    // }
-
     /// @notice owner of the platform can ban a property
-    function banProperty(uint256 propertyId) external checkPromissoryOwner() {
+    function banProperty(uint256 _propertyId) external checkPromissoryOwner() {
 
-        require(propertyIdToProperty[propertyId].status == PropertyStatus.ADDED, "Property do not exist!!");
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property do not exist!!");
 
-        propertyIdToProperty[propertyId].status = PropertyStatus.BANNED;
+        propertyIdToProperty[_propertyId].status = PropertyStatus.BANNED;
 
-        emit PropertyBanned(propertyId, propertyIdToProperty[propertyId].owner);
+        emit PropertyBanned(_propertyId, propertyIdToProperty[_propertyId].owner);
     }
 
     /// @notice owner of the platform will approve a property and it'll be tokenized and the tokens will be locked in the smart contract
-    function approveProperty(uint256 propertyId, uint256 numberOfTokensToLock) external checkPromissoryOwner() {
+    function approveProperty(uint256 _propertyId, uint256 _numberOfTokensToLock) external checkPromissoryOwner() {
 
-        require(propertyIdToProperty[propertyId].status == PropertyStatus.ADDED, "Property do not exist!");
-        require(lockedTokens[propertyId] + numberOfTokensToLock <= propertyIdToProperty[propertyId].tokenSupply, "Token release exceeds token supply");
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property do not exist!");
+        require(lockedTokens[_propertyId] + _numberOfTokensToLock <= propertyIdToProperty[_propertyId].tokenSupply, "Token release exceeds token supply");
 
         ERC20Token t = new ERC20Token(
-            propertyIdToProperty[propertyId].tokenName,
-            propertyIdToProperty[propertyId].tokenSymbol,
-            propertyIdToProperty[propertyId].tokenSupply
+            propertyIdToProperty[_propertyId].tokenName,
+            propertyIdToProperty[_propertyId].tokenSymbol,
+            propertyIdToProperty[_propertyId].tokenSupply
         );
 
-        propertyIdToTokenAddress[propertyId] = address(t);
+        propertyIdToTokenAddress[_propertyId] = address(t);
 
-        propertyIdToProperty[propertyId].status = PropertyStatus.APPROVED;
+        propertyIdToProperty[_propertyId].status = PropertyStatus.APPROVED;
 
-        ERC20Token(propertyIdToTokenAddress[propertyId]).transfer(address(this), numberOfTokensToLock);
-        lockedTokens[propertyId] += numberOfTokensToLock;
+        ERC20Token(propertyIdToTokenAddress[_propertyId]).transfer(address(this), _numberOfTokensToLock);
+        lockedTokens[_propertyId] += _numberOfTokensToLock;
 
         emit PropertyApprovedAndTokenized(
-            propertyId,
-            propertyIdToProperty[propertyId].owner,
-            propertyIdToProperty[propertyId].tokenName,
-            propertyIdToProperty[propertyId].tokenSymbol,
-            propertyIdToProperty[propertyId].tokenSupply,
-            propertyIdToTokenAddress[propertyId],
-            numberOfTokensToLock
+            _propertyId,
+            propertyIdToProperty[_propertyId].owner,
+            propertyIdToProperty[_propertyId].tokenName,
+            propertyIdToProperty[_propertyId].tokenSymbol,
+            propertyIdToProperty[_propertyId].tokenSupply,
+            propertyIdToTokenAddress[_propertyId],
+            _numberOfTokensToLock
         );
     }
 
     /// @notice owner of the platform can update the interest rate of a property
-    function updateInterestRate(uint propertyId, uint256 _interestRate) external checkPromissoryOwner(){
+    function updateInterestRate(uint _propertyId, uint256 _interestRate) external checkPromissoryOwner(){
         
-        require(propertyIdToProperty[propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
 
-        propertyIdToProperty[propertyId].interestRate = _interestRate;
+        propertyIdToProperty[_propertyId].interestRate = _interestRate;
 
-        emit InterestRateUpdated(propertyId, _interestRate);
+        emit InterestRateUpdated(_propertyId, _interestRate);
     }
 
     /// @notice investors can invest in property now
-    function investInProperty(uint256 propertyId, uint256 investmentAmount) external {
+    function investInProperty(uint256 _propertyId, uint256 _investmentAmount) external {
 
-        require(propertyIdToProperty[propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!, Wait for platform to approve this property.");
-        require(investmentAmount <= lockedTokens[propertyId], "Invested Amount exceeds the number of Property Tokens available");
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!, Wait for platform to approve this property.");
+        require(_investmentAmount <= lockedTokens[_propertyId], "Invested Amount exceeds the number of Property Tokens available");
         
-        IERC20(USDT).transferFrom(msg.sender, address(this), investmentAmount);
-        investedAmount[propertyId] += investmentAmount;
+        IERC20(USDT).transferFrom(msg.sender, address(this), _investmentAmount);
+        totalInvestedAmount[_propertyId] += _investmentAmount;
 
-        ERC20Token(propertyIdToTokenAddress[propertyId]).transfer(msg.sender, investmentAmount);
-        lockedTokens[propertyId] -= investmentAmount;
+        ERC20Token(propertyIdToTokenAddress[_propertyId]).transfer(msg.sender, _investmentAmount);
+        lockedTokens[_propertyId] -= _investmentAmount;
 
-        emit Invested(propertyId, msg.sender, investmentAmount, propertyIdToProperty[propertyId].tokenSupply, propertyIdToProperty[propertyId].interestRate);
+        investments[_propertyId][msg.sender] = Investment({
+            investor: msg.sender,
+            investmentAmount: _investmentAmount,
+            timeStamp: block.timestamp.div(86400)
+        });
+
+        emit Invested(_propertyId, msg.sender, _investmentAmount, propertyIdToProperty[_propertyId].tokenSupply, propertyIdToProperty[_propertyId].interestRate);
     }
 
-    /// @notice Property owners can claim the investment that has been invested in thier property up until now
-    function claimInvestment(uint256 propertyId, uint256 numberOfTokensToClaim) external {
+    /// @notice Property owners can claim the investment in form of loan that has been invested in thier property up until now
+    function claimLoan(uint256 _propertyId, uint256 _numberOfTokensToClaim) external {
 
-        require(msg.sender != propertyIdToProperty[propertyId].owner, "You are not the onwer of this property!");
-        require(numberOfTokensToClaim <= investedAmount[propertyId] , "Amount exceeds than available!");
+        require(msg.sender != propertyIdToProperty[_propertyId].owner, "You are not the onwer of this property!");
+        require(_numberOfTokensToClaim <= totalInvestedAmount[_propertyId], "Amount exceeds than available!");
 
-        IERC20(USDT).transferFrom(address(this), propertyIdToProperty[propertyId].owner, numberOfTokensToClaim);
+        IERC20(USDT).transferFrom(address(this), propertyIdToProperty[_propertyId].owner, _numberOfTokensToClaim);
 
-        claimedInvestment[propertyId] += numberOfTokensToClaim;
+        claimedLoan[_propertyId] += _numberOfTokensToClaim;
 
-        emit InvestmentClaimed(msg.sender, propertyId, numberOfTokensToClaim);
+        emit ClaimedLoan(msg.sender, _propertyId, _numberOfTokensToClaim);
+    }
+
+    /// @notice Property owner have to return loan with interest to the smart contract
+    function returnLoan(uint256 _propertyId, address _investor) external {
+
+        require(msg.sender != propertyIdToProperty[_propertyId].owner, "You are not the owner of this property!");
+        require((investments[_propertyId][_investor]).timeStamp - (block.timestamp).div(86400) >= propertyIdToProperty[_propertyId].lockingPeriod, "Locking period isn't completed yet!");
+
+        uint256 returnAmount = ((investments[_propertyId][_investor]).investmentAmount)*(1 + propertyIdToProperty[_propertyId].interestRate);
+
+        IERC20(USDT).transferFrom(msg.sender, address(this), returnAmount);
+
+        //ask about how to update investment detail now
+
+        emit ReturnedLoan(msg.sender, _investor, returnAmount, (investments[_propertyId][_investor]).investmentAmount);
+    }
+
+    /// @notice Investors can claim the returned investment amount and return the proeprty token to property owner
+    function claimInvestment(uint256 _propertyId, uint256 _returnAmount) external {
+
+        require(msg.sender != (investments[_propertyId][msg.sender]).investor, "You have not invested in this property!");
+
+        IERC20(USDT).transferFrom(address(this), msg.sender, _returnAmount);
+        totalInvestedAmount[_propertyId] -= (investments[_propertyId][msg.sender]).investmentAmount;
+
+        ERC20Token(propertyIdToTokenAddress[_propertyId]).transfer(address(this), (investments[_propertyId][msg.sender]).investmentAmount);
+        lockedTokens[_propertyId] += (investments[_propertyId][msg.sender]).investmentAmount;
+
+        emit ClaimedInvestment(msg.sender, _propertyId, _returnAmount);
+    }
+
+    /// @notice Property Onwers can claim the property tokens locked in the smart contract
+    function claimPropertyTokens(uint256 _propertyId, uint256 _claimTokens) external {
+        require(msg.sender != propertyIdToProperty[_propertyId].owner, "You are not the owner of this property!");
+        require(_claimTokens <= lockedTokens[_propertyId], "You are claiming more tokens than locked!");
+
+        ERC20Token(propertyIdToTokenAddress[_propertyId]).transfer(msg.sender, _claimTokens);
+        lockedTokens[_propertyId] -= _claimTokens;
+
+        emit ClaimedPropertyTokens(msg.sender, _propertyId, _claimTokens);
     }
 
 }
