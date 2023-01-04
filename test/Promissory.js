@@ -86,6 +86,7 @@ describe("Promissory Contract", ()=>{
             await expect(promissory.approveProperty(1, 100)).to.be.reverted
         })
     })
+    //TODO: Should interest Rate Be Updated if Property is approved?
     describe("Update Interest Rate of Property", ()=>{  
         it("If Property Updater is not promissory owner it should throw error", async ()=>{
             await expect((promissory.connect(promissoryUser1).updateInterestRate(1, 2))).to.be.revertedWith('Caller is not the owner of the platform') 
@@ -99,28 +100,35 @@ describe("Promissory Contract", ()=>{
             await expect(promissory.updateInterestRate(2, 3)).to.be.revertedWith('Property isn\'t approved yet!')
         })
     })
+    //TODO: Can Property Be banned if approoved
+    //TODO: Can Banned Property be aprooved?
     describe("Ban Property", ()=>{  
         it("If Property Banner is not promissory owner it should throw error", async ()=>{
             await expect((promissory.connect(promissoryUser1).banProperty(1))).to.be.revertedWith('Caller is not the owner of the platform') 
         })
-        it("If Property Banner is not promissory owner it should throw error", async ()=>{
-            await expect((promissory.banProperty(1))).to.be.revertedWith('Caller is not the owner of the platform') 
+        it("If Property Banner is promissory owner and Property Id is valid, should be success", async ()=>{
+            await expect((promissory.banProperty(2))).to.emit(promissory, "PropertyBanned")
+        })
+        it("It should Throw Error if property does not exist", async ()=>{
+            //console.log('Promisoory is', promissory)
+            await expect(promissory.banProperty(10)).to.be.revertedWith('Property do not exist!!')
+        })
+    })
+    //TODO: Can property Owner invest in his own property?
+    //TODO: Can Investor re-invest in same property?
+    describe("Invest In Property", ()=>{  
+        it("User should Invest in Approved Property", async ()=>{
+            await expect((promissory.connect(promissoryUser1).investInProperty(1, 10))).to.emit(promissory, 'Invested') 
+        })
+        it("Limit should be changed from 100 to 90, thus betting 100 should throw error", async ()=>{
+            await expect((promissory.connect(promissoryUser1).investInProperty(1, 100))).to.be.revertedWith('Invested Amount exceeds the number of Property Tokens available') 
+        })
+        it("It should Throw Error if Property is banned", async ()=>{
+            await expect((promissory.investInProperty(2,10))).to.be.revertedWith('Property isn\'t approved yet!, Wait for platform to approve this property.') 
         })
         it("It should Approve Property if SM caller is Owner", async ()=>{
             //console.log('Promisoory is', promissory)
-            await expect(await promissory.updateInterestRate(1, 800).call({from: "0x2F13629e03286fA8C1135AfBccaF7DF810299fC4"})).to.emit(promissory, "InterestRateUpdated") 
+            await expect(promissory.updateInterestRate(1, 800).call({from: "0x2F13629e03286fA8C1135AfBccaF7DF810299fC4"})).to.emit(promissory, "InterestRateUpdated") 
         })
     })
-    // describe("Invest In Property", ()=>{  
-    //     it("It should Throw Error if SM caller is not Owner", async ()=>{
-    //         await expect((await promissory.approveProperty(1, 800))).to.Throw 
-    //     })
-    //     it("It should Throw Error if SM caller is Owner, but property Id is invalid", async ()=>{
-    //         await expect((await promissory.approveProperty(1, 800))).to.Throw 
-    //     })
-    //     it("It should Approve Property if SM caller is Owner", async ()=>{
-    //         //console.log('Promisoory is', promissory)
-    //         await expect(await promissory.updateInterestRate(1, 800).call({from: "0x2F13629e03286fA8C1135AfBccaF7DF810299fC4"})).to.emit(promissory, "InterestRateUpdated") 
-    //     })
-    // })
 })
