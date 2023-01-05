@@ -54,9 +54,9 @@ contract Promissory{
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
-    event ClaimedLoan(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
-    event ReturnedLoan(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
-    event ClaimedInvestment(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
+    event ClaimedInvestment(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
+    event ReturnedInvestment(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
+    event ClaimedReturn(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
     event ClaimedPropertyTokens(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedTokens);
 
     /// @dev An enum for representing whether a property is
@@ -122,7 +122,7 @@ contract Promissory{
     mapping (uint256 => address) public propertyIdToTokenAddress;// propertyId to property token address
     mapping (uint256 => uint256) public lockedTokens;// propertyId to numberOfTokens that has been locked in the smart contract of that propertyId
     mapping (uint256 => uint256) public totalInvestedAmount;// invested amount in a property
-    mapping (uint256 => uint256) public claimedLoan;// claimed loan amount by owner of property
+    mapping (uint256 => uint256) public claimedInvestment;// claimed loan amount by owner of property
     mapping (uint256 => mapping (address => Investment)) public investments;// Mapping for storing investment information with tokenID and invetsor address
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
@@ -268,21 +268,21 @@ contract Promissory{
         emit Invested(_propertyId, msg.sender, _investmentAmount, propertyIdToProperty[_propertyId].tokenSupply, propertyIdToProperty[_propertyId].interestRate);
     }
 
-    /// @notice Property owners can claim the investment in form of loan that has been invested in thier property up until now
-    function claimLoan(uint256 _propertyId, uint256 _numberOfTokensToClaim) external {
+    /// @notice Property owners can claim the investment that has been invested in thier property up until now
+    function claimInvestment(uint256 _propertyId, uint256 _numberOfTokensToClaim) external {
 
         require(msg.sender != propertyIdToProperty[_propertyId].owner, "You are not the onwer of this property!");
         require(_numberOfTokensToClaim <= totalInvestedAmount[_propertyId], "Amount exceeds than available!");
 
         IERC20(USDT).transferFrom(address(this), propertyIdToProperty[_propertyId].owner, _numberOfTokensToClaim);
 
-        claimedLoan[_propertyId] += _numberOfTokensToClaim;
+        claimedInvestment[_propertyId] += _numberOfTokensToClaim;
 
-        emit ClaimedLoan(msg.sender, _propertyId, _numberOfTokensToClaim);
+        emit ClaimedInvestment(msg.sender, _propertyId, _numberOfTokensToClaim);
     }
 
     /// @notice Property owner have to return loan with interest to the smart contract
-    function returnLoan(uint256 _propertyId, address _investor) external {
+    function returnInvestment(uint256 _propertyId, address _investor) external {
 
         require(msg.sender != propertyIdToProperty[_propertyId].owner, "You are not the owner of this property!");
         require((investments[_propertyId][_investor]).timeStamp - (block.timestamp).div(86400) >= propertyIdToProperty[_propertyId].lockingPeriod, "Locking period isn't completed yet!");
@@ -293,11 +293,11 @@ contract Promissory{
 
         //ask about how to update investment detail now
 
-        emit ReturnedLoan(msg.sender, _investor, returnAmount, (investments[_propertyId][_investor]).investmentAmount);
+        emit ReturnedInvestment(msg.sender, _investor, returnAmount, (investments[_propertyId][_investor]).investmentAmount);
     }
 
     /// @notice Investors can claim the returned investment amount and return the proeprty token to property owner
-    function claimInvestment(uint256 _propertyId, uint256 _returnAmount) external {
+    function claimReturn(uint256 _propertyId, uint256 _returnAmount) external {
 
         require(msg.sender != (investments[_propertyId][msg.sender]).investor, "You have not invested in this property!");
 
@@ -307,7 +307,7 @@ contract Promissory{
         ERC20Token(propertyIdToTokenAddress[_propertyId]).transfer(address(this), (investments[_propertyId][msg.sender]).investmentAmount);
         lockedTokens[_propertyId] += (investments[_propertyId][msg.sender]).investmentAmount;
 
-        emit ClaimedInvestment(msg.sender, _propertyId, _returnAmount);
+        emit ClaimedReturn(msg.sender, _propertyId, _returnAmount);
     }
 
     /// @notice Property Onwers can claim the property tokens locked in the smart contract
@@ -320,5 +320,4 @@ contract Promissory{
 
         emit ClaimedPropertyTokens(msg.sender, _propertyId, _claimTokens);
     }
-
 }
