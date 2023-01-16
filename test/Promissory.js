@@ -1,5 +1,7 @@
-const {expect}=require('chai')
+const chai=require('chai')
+const expect=chai.expect
 const hre=require('hardhat')
+
 const tokenName="Promissory Token"
 const PropertyInfo=[
     {
@@ -10,7 +12,8 @@ const PropertyInfo=[
         tokenSymbol: 'PTT1',
         interestRate: 725,
         lockingPeriod: 1,
-        tokenAddress: null
+        tokenAddress: null,
+        updatedInterestRate: 3
     },
     {
         //By User 1
@@ -19,7 +22,8 @@ const PropertyInfo=[
         tokenSymbol: 'PTT2',
         interestRate: 5025,
         lockingPeriod: 10,
-        tokenAddress: null
+        tokenAddress: null,
+        updatedInterestRate: 3
     },
     {
         //By User 2
@@ -28,7 +32,8 @@ const PropertyInfo=[
         tokenSymbol: 'PTT3',
         interestRate: 125,
         lockingPeriod: 2,
-        tokenAddress: null
+        tokenAddress: null,
+        updatedInterestRate: 3
     },
     {
         //By User 2
@@ -37,7 +42,8 @@ const PropertyInfo=[
         tokenSymbol: 'PTT4',
         interestRate: 125,
         lockingPeriod: 2,
-        tokenAddress: null
+        tokenAddress: null,
+        updatedInterestRate: 3
     }
 ]
 const propertyTokenSymbol="XYZ"
@@ -90,13 +96,13 @@ describe("Promissory Contract", ()=>{
 
     describe('Approvals', ()=>{
         
-        it('Promissory User 1 Should give approval to smart contract to receive 100 USDT from his address', async()=>{
-            await USDT_Token.connect(promissoryUser1).approve(promissory.address, 100)
-            await expect(await USDT_Token.allowance(promissoryUser1.address, promissory.address)).equal(100)
+        it('Promissory User 1 Should give approval to smart contract to receive 500 USDT from his address', async()=>{
+            await USDT_Token.connect(promissoryUser1).approve(promissory.address, 500)
+            await expect(await USDT_Token.allowance(promissoryUser1.address, promissory.address)).equal(500)
         })
-        it('Promissory User 2 Should give approval to smart contract to receive 100 USDT from his address', async()=>{
-            await USDT_Token.connect(promissoryUser2).approve(promissory.address, 100)
-            await expect(await USDT_Token.allowance(promissoryUser2.address, promissory.address)).equal(100)
+        it('Promissory User 2 Should give approval to smart contract to receive 500 USDT from his address', async()=>{
+            await USDT_Token.connect(promissoryUser2).approve(promissory.address, 500)
+            await expect(await USDT_Token.allowance(promissoryUser2.address, promissory.address)).equal(500)
         })
     })
     describe("Add Property By Owner", ()=>{  
@@ -116,10 +122,39 @@ describe("Promissory Contract", ()=>{
         it("Add Property should throw error if locking period is negative", async ()=>{
             await expect(promissory.addProperty(tokenName, propertyTokenSymbol, 100,725, -1 )).to.Throw
         })
-        it('Property with id 0 should have owner as promissory owner', async()=>{
+    })
+    describe('Property with id 0 should have valid Properties', ()=>{
+        it('Should Have Property Id as 0',async ()=>{
             const response=(await promissory.property(0))
-            //console.log('Property with id 0 is', response)
+            expect(response[0]).to.be.equal(0)
+        })
+        it('Should Have Owner Address as the platform owner address',async ()=>{
+            const response=(await promissory.property(0))
             expect(response[1]).to.be.equal(owner.address)
+        })
+        it('Should Have Valid Token Name',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[2]).to.be.equal(PropertyInfo[0].tokenName)
+        })
+        it('Should Have Valid Token Symbol',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[3]).to.be.equal(PropertyInfo[0].tokenSymbol)
+        })
+        it('Should Have Valid Token Supply',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[4]).to.be.equal(PropertyInfo[0].tokenSupply)
+        })
+        it('Should Have Valid Interest Rate',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[5]).to.be.equal(PropertyInfo[0].interestRate)
+        })
+        it('Should Have Valid Locking Period',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[6]).to.be.equal(PropertyInfo[0].lockingPeriod)
+        })
+        it('Should Have Valid Status',async ()=>{
+            const response=(await promissory.property(0))
+            expect(response[7]).to.be.equal(1)
         })
     })
     describe("Add Property By External Promissory Users", ()=>{  
@@ -157,20 +192,16 @@ describe("Promissory Contract", ()=>{
             expect(response[1]).to.be.equal(promissoryUser2.address)
         })
     })
-    describe("Approve Property", ()=>{  
+    describe("Approve Property (Complete Tokenization)", ()=>{  
         it("It should Throw Error if SM caller is not Owner", async ()=>{
-            await expect((promissory.connect(promissoryUser1).approveProperty(1, 100))).to.be.revertedWith("Caller is not the owner of the platform"); 
+            await expect((promissory.connect(promissoryUser1).approveProperty(1))).to.be.revertedWith("Caller is not the owner of the platform"); 
         })
         it("It should Throw Error if SM caller is Owner, but property Id is invalid", async ()=>{
-            await expect((promissory.approveProperty(15, 100))).to.be.revertedWith("Property do not exist!") 
+            await expect((promissory.approveProperty(15))).to.be.revertedWith("Property do not exist!") 
         })
-        it("It revert Approve Property if SM caller is Owner, and number of tokens to lock is greater than supply", async ()=>{
+        it("It should Approve Property if SM caller is Owner , Property Id Is Valid", async ()=>{
             //console.log('Promisoory is', promissory)
-            await expect(promissory.approveProperty(1, 1000)).to.be.revertedWith('Token release exceeds token supply') 
-        })
-        it("It should Approve Property if SM caller is Owner, and number of tokens to lock is equal to supply", async ()=>{
-            //console.log('Promisoory is', promissory)
-            await expect(promissory.approveProperty(1, PropertyInfo[1].tokenSupply)).to.emit(promissory, "PropertyApprovedAndTokenized").withArgs(
+            await expect(promissory.approveProperty(1)).to.emit(promissory, "PropertyApprovedAndTokenized").withArgs(
                 1,
                 promissoryUser1.address,
                 PropertyInfo[1].tokenName,
@@ -181,29 +212,18 @@ describe("Promissory Contract", ()=>{
                     PropertyInfo[1].tokenAddress=ERC20TokenAddress
                     return true
                 },
+                2,
                 PropertyInfo[1].tokenSupply
             ) 
-        })
-        it("It should Approve Property if SM caller is Owner, and number of tokens to lock is > 0 and < supply", async ()=>{
-            //console.log('Promisoory is', promissory)
-            await expect(promissory.approveProperty(2, PropertyInfo[2].tokenSupply-10)).to.emit(promissory, "PropertyApprovedAndTokenized").withArgs(
-                2,
-                promissoryUser2.address,
-                PropertyInfo[2].tokenName,
-                PropertyInfo[2].tokenSymbol,
-                PropertyInfo[2].tokenSupply,
-                (ERC20TokenAddress)=>{
-                    console.log('ERC 20 Token Address For Property 2 is', ERC20TokenAddress)
-                    PropertyInfo[2].tokenAddress=ERC20TokenAddress
-                    return true
-                },
-                PropertyInfo[2].tokenSupply-10
-            )  
         })
         //TODO: Verify
         it("It should throw error, if approoving an already approved property", async ()=>{
             //console.log('Promisoory is', promissory)
-            await expect(promissory.approveProperty(1, 100)).to.be.revertedWith('Property do not exist!')
+            await expect(promissory.approveProperty(1)).to.be.revertedWith('Property do not exist!')
+        })
+        it('Approved property with 1 must have status of 2 in its state', async()=>{
+            const response=(await promissory.property(1))
+            expect(response[7]).to.be.equal(2)
         })
     })
     describe("Ban Property", ()=>{  
@@ -211,7 +231,11 @@ describe("Promissory Contract", ()=>{
             await expect((promissory.connect(promissoryUser1).banProperty(1))).to.be.revertedWith('Caller is not the owner of the platform') 
         })
         it("If Property Banner is promissory owner and Property Id is valid and property is not approved, it should be banned", async ()=>{
-            await expect((promissory.banProperty(0))).to.emit(promissory, "PropertyBanned")
+            const property=(await promissory.property(0))
+            await expect((promissory.banProperty(0))).to.emit(promissory, "PropertyBanned").withArgs(
+                0,
+                property[1]
+            )
         })
         it("It should Throw Error if property exists but is approved", async ()=>{
             //console.log('Promisoory is', promissory)
@@ -220,6 +244,10 @@ describe("Promissory Contract", ()=>{
         it("It should Throw Error if property does not exist", async ()=>{
             await expect(promissory.banProperty(10)).to.be.revertedWith('Property do not exist!!')
         })
+        it('Banned property with Id 0 must have status of 3 in its state', async()=>{
+            const response=(await promissory.property(0))
+            expect(response[7]).to.be.equal(3)
+        })
     })
     describe("Update Interest Rate of Property", ()=>{  
         it("If Property Updater is not promissory owner it should throw error", async ()=>{
@@ -227,7 +255,9 @@ describe("Promissory Contract", ()=>{
         })
         it("It should Update Interest Rate of property if SM caller is Owner", async ()=>{
             //console.log('Promisoory is', promissory)
-            await expect(promissory.updateInterestRate(1, 3)).to.emit(promissory, "InterestRateUpdated") 
+            await expect(promissory.updateInterestRate(1, PropertyInfo[1].updatedInterestRate)).to.emit(promissory, "InterestRateUpdated") .withArgs(
+                1, PropertyInfo[1].updatedInterestRate
+            )
         })
         it("Property which is not approved, shall not be updated", async ()=>{
             //console.log('Promisoory is', promissory)
@@ -235,17 +265,19 @@ describe("Promissory Contract", ()=>{
         })
     })
     describe("Invest In Property", ()=>{  
-        it("User should Invest in Approved Property", async ()=>{
+        it("User should Invest 10 (i.e < totalSupply) in Approved Property with id 1", async ()=>{
             //console.log('Promissory contract is?', promissory)
-            await expect((promissory.connect(promissoryUser1).investInProperty(1, 10))).to.emit(promissory, 'Invested') 
+            await expect((promissory.connect(promissoryUser1).investInProperty(1, 10))).to.emit(promissory, 'Invested').withArgs(
+                1, promissoryUser1.address, 10, PropertyInfo[1].tokenSupply, PropertyInfo[1].updatedInterestRate
+            ) 
         })
-        it("Limit should be changed from 100 to 90, thus betting 100 should throw error", async ()=>{
-            await expect((promissory.connect(promissoryUser1).investInProperty(1, 100))).to.be.revertedWith('Invested Amount exceeds the number of Property Tokens available') 
+        it("Limit should be changed from Token Supply to Token Supply -10 , thus investing tital Token Supply should throw error", async ()=>{
+            await expect((promissory.connect(promissoryUser1).investInProperty(1, PropertyInfo[1].tokenSupply))).to.be.revertedWith('Invested Amount exceeds the number of Property Tokens available') 
         })
-        it("It should Invest In Property with another Limit", async ()=>{
+        it("User should Invest 20 (another limit i.e < totalSupply) in Approved Property with id 1", async ()=>{
             await expect((promissory.connect(promissoryUser1).investInProperty(1,20))).to.emit(promissory, 'Invested')
         })
-        it("User other than property owner can too invest in the property", async ()=>{
+        it("User other than property owner can too invest in the property id 1, 30 tokens", async ()=>{
             await expect((promissory.connect(promissoryUser2).investInProperty(1,30))).to.emit(promissory, 'Invested')
         })
         it("It should Throw Error if property is banned", async ()=>{
@@ -254,20 +286,43 @@ describe("Promissory Contract", ()=>{
         it("It should Throw Error if property does not exist", async ()=>{
             await expect((promissory.connect(promissoryUser1).investInProperty(9,20))).to.be.revertedWith('Property isn\'t approved yet!, Wait for platform to approve this property.')
         })
+        it('Residual Token Supply Should be Propert id 1 should be totalsupply - total invested',async ()=>{
+            const response=await promissory.lockedTokens(1)
+            //60 Is Invested Amount
+            await expect(response).to.equal(PropertyInfo[1].tokenSupply-60)
+        })
+        it('Total Invested amount Should match the amount invested', async()=>{
+            const response=await promissory.totalInvestedAmount(1)
+            //60 Is Invested Amount
+            await expect(response).to.equal(60)
+        })
     })
-    // //TODO: Can a property be banned after investment?
-    describe("Claim Investement", ()=>{  
+    // // //TODO: Can a property be banned after investment?
+    describe("Claim Investement, Property Owner Can Claim Invested USDT", ()=>{  
         it("Should throw an error, if user claiming investment is not property owner", async ()=>{
             await expect((promissory.connect(promissoryUser2).claimInvestment(1, 10))).to.be.revertedWith('You are not the onwer of this property!')
         })
         it("Should throw an error, if property owner claiming investment tries to claim more than available", async ()=>{
             await expect((promissory.connect(promissoryUser1).claimInvestment(1, 70))).to.be.revertedWith('Amount exceeds than available!')
         })
-        it("User should be able to claim, the investment partially", async ()=>{
-            await expect((promissory.connect(promissoryUser1).investInProperty(1,10))).to.be.emit(promissory, 'ClaimedInvestment')
+        it("Property Owner should be able to claim, the investment partially", async ()=>{
+            await expect((promissory.connect(promissoryUser1).claimInvestment(1,10))).to.be.emit(promissory, 'InvestmentClaimed').withArgs(
+                promissoryUser1.address,
+                1,
+                10
+            )
         })
-        it("User should be able to claim, the investment completely", async ()=>{
-            await expect((promissory.connect(promissoryUser1).investInProperty(1,50))).to.be.emit(promissory, 'ClaimedInvestment')
+        it("Should throw an error, if property owner claiming investment tries to claim more than available, after any withdrawl", async ()=>{
+            await expect((promissory.connect(promissoryUser1).claimInvestment(1,60))).to.be.revertedWith('Amount exceeds than available!')
+        })
+        it('Total Invested amount in property 1 match the total amount invested - any invested amount claimed', async()=>{
+            const claimedInvestment=await promissory.claimedInvestment(1)
+            const totalInvestedAmount=await promissory.totalInvestedAmount(1)
+            //50 Is Invested Amount
+            await expect(totalInvestedAmount-claimedInvestment).to.equal(50)
+        })
+        it("Property Owner should be able to claim, the investment made completely", async ()=>{
+            await expect((promissory.connect(promissoryUser1).claimInvestment(1,50))).to.be.emit(promissory, 'InvestmentClaimed')
         })
     })
     describe("Claim Return", ()=>{  
@@ -282,6 +337,21 @@ describe("Promissory Contract", ()=>{
         })
         it("Investor should be able to claim the complete returns", async ()=>{
             await expect((promissory.connect(promissoryUser1).claimReturn(1,20))).to.be.emit(promissory, 'ClaimedInvestment')
+        })
+    })
+    describe('Claim Property Token Locked in Smart Contract By Property Owner', ()=>{
+        it("Should throw an error, if user claiming property Token Back is not property owner", async ()=>{
+            await expect((promissory.connect(promissoryUser2).claimPropertyTokens(1, 10))).to.be.revertedWith('You are not the owner of this property!')
+        })
+        it('If Tokens are already invested in, user can not withdraw more than locked token', async ()=>{
+            const response=await promissory.lockedTokens(1)
+            console.log('Residual Locked Tokens are', response)
+            await expect((promissory.connect(promissoryUser1).claimPropertyTokens(1, PropertyInfo[1].tokenSupply))).to.be.revertedWith('You are claiming more tokens than locked!')
+        })
+    })
+    describe('Return Investment Made with interest by property owner', ()=>{
+        it("Should throw an error, if user retuning investment made is not the owner of property", async ()=>{
+            await expect((promissory.connect(promissoryUser2).returnInvestment(1, promissoryUser1.address))).to.be.revertedWith('You are not the owner of this property!')
         })
     })
 })
