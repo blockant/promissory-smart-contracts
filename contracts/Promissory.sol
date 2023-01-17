@@ -59,7 +59,6 @@ contract Promissory{
     event InvestmentReturned(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
     event ReturnClaimed(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
     event PropertyTokensClaimed(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedTokens);
-    event ApprovedReturnClaim(address indexed Promissory, address indexed Investor, uint256 indexed ReturnAmount);
 
     /// @dev An enum for representing whether a property is
     /// @param Pending when nothing happend
@@ -293,16 +292,6 @@ contract Promissory{
         );
     }
 
-    // get length of array that stores propertyDetails
-    function getPropertyListLength() public view returns (uint256) {
-        return property.length;
-    }
-
-    // get length of array that stores investmentDetails
-    function getInvestmentListLength() public view returns (uint256) {
-        return investmentList.length;
-    }
-
     /// @notice investors can invest in property now
     function investInProperty(uint256 _propertyId, uint256 _investmentAmount) external {
 
@@ -366,17 +355,6 @@ contract Promissory{
     emit InvestmentReturned(msg.sender, _investor, _returnAmount, _investedAmount);
     }
 
-    /// @notice Investor needs approval for the return amount by the Promissory Contract
-    function approveInvestor(address _investor, uint _returnAmount) public payable {
-        // Promissory Contract's storage is set, USDT is not modified.
-        IERC20(USDT).approve(address(this), _returnAmount);
-        (bool success, bytes memory data) = USDT.delegatecall(
-            abi.encodeWithSignature("approve(address, uint256)", _investor, _returnAmount)
-        );
-
-        emit ApprovedReturnClaim(msg.sender, _investor, _returnAmount);
-    }
-
     /// @notice Investors can claim the returned investment amount and return the proeprty token to property owner
     function claimReturn(uint256 _propertyId, uint256 _returnAmount) external {
 
@@ -403,5 +381,13 @@ contract Promissory{
         lockedTokens[_propertyId] -= _claimTokens;
 
         emit PropertyTokensClaimed(msg.sender, _propertyId, _claimTokens);
+    }
+
+    function getProperties() public view returns (Property[] memory) {
+    return property;
+    }
+
+    function getinvestments() public view returns (Investment[] memory) {
+        return investmentList;
     }
 }
