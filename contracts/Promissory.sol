@@ -52,6 +52,7 @@ contract Promissory{
     event PropertyBanned(uint256 indexed PropertyId, address indexed PropertyOwner);
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress,PropertyStatus Status, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
+    event TokenSupplyUpdated(uint256 indexed PropertyId, uint256 TokenSupply);
     event LockingPeriodUpdated(uint256 indexed PropertyId, uint256 indexed LockingPeriod);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
     event InvestmentClaimed(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
@@ -259,6 +260,21 @@ contract Promissory{
 
         emit InterestRateUpdated(_propertyId, _interestRate);
     }
+
+    /// @notice owner of the property can update the token supply of a property
+    function updateTokenSupply(uint _propertyId, uint256 _tokenSupply) external {
+        
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property has already been APPROVED or BANNED!");
+        require(propertyIdToProperty[_propertyId].owner == msg.sender, "You are not the owner of this Property!");
+        
+        propertyIdToProperty[_propertyId].tokenSupply = _tokenSupply;
+
+        Property storage propertyTokenSupply = property[_propertyId];
+        propertyInterestRate.tokenSupply = _tokenSupply;
+
+        emit TokenSupplyUpdated(_propertyId, _tokenSupply);
+    }
+
 
     /// @notice owner of a property can update the locking period of it's respective property
     function updateLockingPeriod(uint _propertyId, uint256 _updateLockingPeriod) external {
