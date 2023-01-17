@@ -368,7 +368,7 @@ contract Promissory{
 
     /// @notice Investor needs approval for the return amount by the Promissory Contract
     function approveInvestor(address _investor, uint _returnAmount) public payable {
-        // A's storage is set, B is not modified.
+        // Promissory Contract's storage is set, USDT is not modified.
         IERC20(USDT).approve(address(this), _returnAmount);
         (bool success, bytes memory data) = USDT.delegatecall(
             abi.encodeWithSignature("approve(address, uint256)", _investor, _returnAmount)
