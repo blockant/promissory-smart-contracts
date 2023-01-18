@@ -400,6 +400,9 @@ contract Promissory{
     mapping (uint256 => uint256) public totalInvestedAmount;// invested amount in a property
     mapping (uint256 => uint256) public claimedInvestment;// claimed loan amount by owner of property
     mapping (uint256 => mapping (address => Investment)) public investments;// Mapping for storing investment information with tokenID and invetsor address
+    
+    
+    
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -444,7 +447,7 @@ contract Promissory{
         userProperty.tokenName = _tokenName;
         userProperty.tokenSymbol = _tokenSymbol;
         userProperty.tokenSupply = _tokenSupply;
-        userProperty.interestRate = _interestRate ;//handling two decimal points
+        userProperty.interestRate = _interestRate ; //enter input upto decimal places. 525 means 5.25
         userProperty.lockingPeriod = _lockingPeriod;
 
         userProperty.status = PropertyStatus.ADDED;
@@ -528,11 +531,16 @@ contract Promissory{
     }
 
     /// @notice owner of the platform can update the interest rate of a property
-    function updateInterestRate(uint _propertyId, uint256 _interestRate) external checkPromissoryOwner(){
+    function updateInterestRate(uint _propertyId, uint256 _interestRate) external {
         
-        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
-
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property has already been APPROVED or BANNED!");
+        require(propertyIdToProperty[_propertyId].owner == msg.sender, "You are not the owner of this Property!");
+        
         propertyIdToProperty[_propertyId].interestRate = _interestRate;
+
+        Property storage propertyInterestRate = property[_propertyId];
+        propertyInterestRate.interestRate = _interestRate;
+
 
         emit InterestRateUpdated(_propertyId, _interestRate);
     }
@@ -608,8 +616,9 @@ contract Promissory{
     function returnInvestment(uint256 _propertyId, address _investor) external {
 
         require(msg.sender == propertyIdToProperty[_propertyId].owner, "You are not the owner of this property!");
-        // require((investments[_propertyId][_investor]).timeStamp - (block.timestamp).div(86400) >= propertyIdToProperty[_propertyId].lockingPeriod, "Locking period isn't completed yet!");
-        // require((investments[_propertyId][_investor]).timeStamp - block.timestamp >= propertyIdToProperty[_propertyId].lockingPeriod, "Locking period isn't completed yet!");
+
+        uint256 _blockTimeStamp = block.timestamp;
+        require((investments[_propertyId][_investor]).timeStamp + propertyIdToProperty[_propertyId].lockingPeriod < _blockTimeStamp, "Locking period isn't completed yet!");
 
         uint256 _investedAmount = (investments[_propertyId][_investor]).investmentAmount; //500 * 10 ** 18
         uint256 _interestRate = propertyIdToProperty[_propertyId].interestRate; //525
