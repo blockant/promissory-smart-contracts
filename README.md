@@ -12,6 +12,11 @@ npx hardhat node
 npx hardhat run scripts/deploy.js
 ```
 
+Latest Deployment(19/01/2023 12:44 AM): https://mumbai.polygonscan.com/address/0x039032fe5d989037e3ef6315475228c1dd5ee485
+
+For function input reference, use: https://mumbai.polygonscan.com/address/0x40cc438c7294918a889186b979382232003f526e
+
+
 # Promissory
 
 - [x] Compiled  
