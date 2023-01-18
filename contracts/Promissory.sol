@@ -52,13 +52,13 @@ contract Promissory{
     event PropertyBanned(uint256 indexed PropertyId, address indexed PropertyOwner);
     event PropertyApprovedAndTokenized(uint256 indexed PropertyId, address indexed PropertyOwner, string TokenName, string TokenSymbol, uint256 TokenSupply, address indexed PropertyTokenAddress,PropertyStatus Status, uint256 NumberOfLockedTokens);
     event InterestRateUpdated(uint256 indexed PropertyId, uint256 indexed InterestRate);
+    event TokenSupplyUpdated(address indexed Owner, uint256 indexed PropertyId, uint256 TokenSupply);
     event LockingPeriodUpdated(uint256 indexed PropertyId, uint256 indexed LockingPeriod);
     event Invested(uint256 PropertyId, address Investor, uint256 InvestmentAmount, uint256 TokenSupply, uint256 InterestRate);
     event InvestmentClaimed(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedAmount);
     event InvestmentReturned(address indexed PropertyOwner,address indexed Investor, uint256 indexed ReturnedAmount, uint256 InvestedAmount);
     event ReturnClaimed(address indexed Investor,uint256 indexed PropertyId,uint256 indexed ReturnedAmount);
     event PropertyTokensClaimed(address indexed PropertyOwner, uint256 indexed PropertyId, uint256 indexed ClaimedTokens);
-    event ApprovedReturnClaim(address indexed Promissory, address indexed Investor, uint256 indexed ReturnAmount);
 
     /// @dev An enum for representing whether a property is
     /// @param Pending when nothing happend
@@ -96,7 +96,7 @@ contract Promissory{
         string tokenName;
         string tokenSymbol;
         uint256 tokenSupply;
-        uint256 interestRate; //handle 2 decimal points (1000)
+        uint256 interestRate; //if your interestRate is 5.89 then please fill 589
         uint256 lockingPeriod;
         PropertyStatus status;
     }
@@ -114,6 +114,9 @@ contract Promissory{
         uint256 investmentAmount;
         uint256 timeStamp;
     }
+
+    // An array to create a list of investments
+    Investment[] public investmentList;
 
     /*//////////////////////////////////////////////////////////////
                                 MAPPING
@@ -171,7 +174,7 @@ contract Promissory{
         userProperty.tokenName = _tokenName;
         userProperty.tokenSymbol = _tokenSymbol;
         userProperty.tokenSupply = _tokenSupply;
-        userProperty.interestRate = _interestRate * 100;//handling two decimal points
+        userProperty.interestRate = _interestRate;//should be integer
         userProperty.lockingPeriod = _lockingPeriod;
 
         userProperty.status = PropertyStatus.ADDED;
@@ -211,6 +214,48 @@ contract Promissory{
         emit PropertyBanned(_propertyId, propertyIdToProperty[_propertyId].owner);
     }
 
+    /// @notice owner of the platform can update the interest rate of a property
+    function updateInterestRate(uint _propertyId, uint256 _interestRate) external checkPromissoryOwner() {
+        
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
+
+        propertyIdToProperty[_propertyId].interestRate = _interestRate;
+
+        Property storage propertyInterestRate = property[_propertyId];
+        propertyInterestRate.interestRate = _interestRate;
+
+        emit InterestRateUpdated(_propertyId, _interestRate);
+    }
+
+    /// @notice owner of the property can update the token supply of a property
+    function updateTokenSupply(uint _propertyId, uint256 _tokenSupply) external {
+        
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property has already been APPROVED or BANNED!");
+        require(propertyIdToProperty[_propertyId].owner == msg.sender, "You are not the owner of this Property!");
+        
+        propertyIdToProperty[_propertyId].tokenSupply = _tokenSupply;
+
+        Property storage propertyTokenSupply = property[_propertyId];
+        propertyTokenSupply.tokenSupply = _tokenSupply;
+
+        emit TokenSupplyUpdated(msg.sender, _propertyId, _tokenSupply);
+    }
+
+
+    /// @notice owner of a property can update the locking period of it's respective property
+    function updateLockingPeriod(uint _propertyId, uint256 _updateLockingPeriod) external {
+        
+        require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property isn't approved yet!");
+        require(propertyIdToProperty[_propertyId].owner == msg.sender, "You are not the owner of this Property!");
+
+        propertyIdToProperty[_propertyId].lockingPeriod = _updateLockingPeriod;
+
+        Property storage propertyLockingPeriod = property[_propertyId];
+        propertyLockingPeriod.lockingPeriod = _updateLockingPeriod;
+
+        emit LockingPeriodUpdated(_propertyId, _updateLockingPeriod);
+    }
+
     /// @notice owner of the platform will approve a property and it'll be tokenized and the tokens will be locked in the smart contract
     function approveProperty(uint256 _propertyId) external checkPromissoryOwner() {
 
@@ -247,33 +292,6 @@ contract Promissory{
         );
     }
 
-    /// @notice owner of the platform can update the interest rate of a property
-    function updateInterestRate(uint _propertyId, uint256 _interestRate) external checkPromissoryOwner() {
-        
-        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
-
-        propertyIdToProperty[_propertyId].interestRate = _interestRate;
-
-        Property storage propertyInterestRate = property[_propertyId];
-        propertyInterestRate.interestRate = _interestRate;
-
-        emit InterestRateUpdated(_propertyId, _interestRate);
-    }
-
-    /// @notice owner of a property can update the locking period of it's respective property
-    function updateLockingPeriod(uint _propertyId, uint256 _updateLockingPeriod) external {
-        
-        require(propertyIdToProperty[_propertyId].status == PropertyStatus.APPROVED, "Property isn't approved yet!");
-        require(propertyIdToProperty[_propertyId].owner == msg.sender, "You are not the owner of this Property!");
-
-        propertyIdToProperty[_propertyId].lockingPeriod = _updateLockingPeriod;
-
-        Property storage propertyLockingPeriod = property[_propertyId];
-        propertyLockingPeriod.lockingPeriod = _updateLockingPeriod;
-
-        emit LockingPeriodUpdated(_propertyId, _updateLockingPeriod);
-    }
-
     /// @notice investors can invest in property now
     function investInProperty(uint256 _propertyId, uint256 _investmentAmount) external {
 
@@ -294,6 +312,13 @@ contract Promissory{
             timeStamp: block.timestamp
         });
 
+        // initialize an empty struct and then update the investment details
+        Investment memory _investmentList;
+        _investmentList.investor = msg.sender;
+        _investmentList.investmentAmount = _investmentAmount;
+        _investmentList.timeStamp = block.timestamp;
+        investmentList.push(_investmentList);
+
         emit Invested(_propertyId, msg.sender, _investmentAmount, propertyIdToProperty[_propertyId].tokenSupply, propertyIdToProperty[_propertyId].interestRate);
     }
 
@@ -304,6 +329,8 @@ contract Promissory{
         require(_numberOfTokensToClaim <= totalInvestedAmount[_propertyId], "Amount exceeds than available!");
 
         IERC20(USDT).transferFrom(address(this), propertyIdToProperty[_propertyId].owner, _numberOfTokensToClaim);
+
+        totalInvestedAmount[_propertyId] -= _numberOfTokensToClaim;
 
         emit InvestmentClaimed(msg.sender, _propertyId, _numberOfTokensToClaim);
     }
@@ -326,19 +353,6 @@ contract Promissory{
     IERC20(USDT).transferFrom(msg.sender, address(this), _returnAmount);
 
     emit InvestmentReturned(msg.sender, _investor, _returnAmount, _investedAmount);
-    }
-
-    /// @notice Promissory owner need to call this funtion to excute approveReturnClaim function
-    function anotherFunction(address _investor, uint256 _returnAmount) public checkPromissoryOwner() {
-        this.approveReturnClaim(_investor, _returnAmount);
-    }
-
-    /// @notice Investors will only claim USDT tokens with interest only if Promissory ahve allowed them to
-    function approveReturnClaim(address _investor, uint256 _returnAmount) external {
-
-        IERC20(USDT).approve(_investor, _returnAmount);
-
-        emit ApprovedReturnClaim(msg.sender, _investor, _returnAmount);
     }
 
     /// @notice Investors can claim the returned investment amount and return the proeprty token to property owner
@@ -367,5 +381,13 @@ contract Promissory{
         lockedTokens[_propertyId] -= _claimTokens;
 
         emit PropertyTokensClaimed(msg.sender, _propertyId, _claimTokens);
+    }
+
+    function getProperties() public view returns (Property[] memory) {
+    return property;
+    }
+
+    function getinvestments() public view returns (Investment[] memory) {
+        return investmentList;
     }
 }
