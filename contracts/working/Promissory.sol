@@ -514,6 +514,10 @@ contract Promissory{
     
         propertyIdToProperty[_propertyId].status = PropertyStatus.APPROVED;
 
+        Property storage propertyStatus = property[_propertyId];
+        propertyStatus.status = PropertyStatus.APPROVED;
+
+
         // uint256 totalSupply = IERC20(USDT).totalSupply();
         // IERC20(USDT).approve(address(this), totalSupply);
 
@@ -659,4 +663,13 @@ contract Promissory{
 
         emit PropertyTokensClaimed(msg.sender, _propertyId, _claimTokens);
     }
+
+    function getProperties() public view returns (Property[] memory) {
+        return property;
+    }
+
+    // function getinvestments() public view returns (Investment[] memory) {
+    //     return investmentList;
+    // }
+
 }
