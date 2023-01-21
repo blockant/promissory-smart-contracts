@@ -368,13 +368,4 @@ contract Promissory{
 
         emit PropertyTokensClaimed(msg.sender, _propertyId, _claimTokens);
     }
-
-    function getProperties() public view returns (Property[] memory) {
-        return property;
-    }
-
-    // function getinvestments() public view returns (Investment[] memory) {
-    //     return investmentList;
-    // }
-
 }
