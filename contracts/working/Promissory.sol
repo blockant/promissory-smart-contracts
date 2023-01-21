@@ -514,6 +514,10 @@ contract Promissory{
     
         propertyIdToProperty[_propertyId].status = PropertyStatus.APPROVED;
 
+        Property storage propertyStatus = property[_propertyId];
+        propertyStatus.status = PropertyStatus.APPROVED;
+
+
         // uint256 totalSupply = IERC20(USDT).totalSupply();
         // IERC20(USDT).approve(address(this), totalSupply);
 
