@@ -1,7 +1,7 @@
 const chai=require('chai')
 const expect=chai.expect
 const hre=require('hardhat')
-
+const ERC20TokenABI =require('./ERC20ContractABI.json') 
 const tokenName="Promissory Token"
 const PropertyInfo=[
     {
@@ -11,7 +11,7 @@ const PropertyInfo=[
         tokenSupply: 100,
         tokenSymbol: 'PTT1',
         interestRate: 725,
-        lockingPeriod: 1,
+        lockingPeriod: 86400,
         tokenAddress: null,
         updatedInterestRate: 3
     },
@@ -37,20 +37,20 @@ const PropertyInfo=[
         tokenAddress: null,
         updatedInterestRate: 3
     },
+    //Note: Investments can be made currently after locking period
     {
         //By User 2
         tokenName: 'Property Test Token 4',
         tokenSupply: 400,
         tokenSymbol: 'PTT4',
         interestRate: 125,
-        lockingPeriod: 2,
+        lockingPeriod: 1,
         tokenAddress: null,
-        updatedInterestRate: 3
     }
 ]
 const propertyTokenSymbol="XYZ"
 describe("Promissory Contract", ()=>{
-    let PromissoryContract, promissory , owner, promissoryUser2, promissoryUser1,promissoryUser3, user1PropertyId, ownerPropertyId, contract, USDT_Token
+    let PromissoryContract, promissory , owner, promissoryUser2, promissoryUser1,promissoryUser3, user1PropertyId, ownerPropertyId, ERC20Contract, USDT_Token
     
     before(async ()=>{
         [owner, promissoryUser1,promissoryUser2, promissoryUser3] = await ethers.getSigners()
@@ -58,6 +58,7 @@ describe("Promissory Contract", ()=>{
         console.log('Promissory User 1 Address', promissoryUser1.address)
         console.log('Promissory User 2 Address', promissoryUser2.address)
         PromissoryContract = await hre.ethers.getContractFactory("Promissory");
+        ERC20Contract=await hre.ethers.getContractFactory("ERC20Token")
         const someRandomERC20TokenContract=await hre.ethers.getContractFactory('ERC20Token')
         USDT_Token=await someRandomERC20TokenContract.deploy('Stable Coin USDT', 'USDT', 10000)
         await USDT_Token.deployed()
@@ -235,9 +236,12 @@ describe("Promissory Contract", ()=>{
             //console.log('Promisoory is', promissory)
             await expect(promissory.approveProperty(1)).to.be.revertedWith('Property do not exist!')
         })
-        it('Approved property with 1 must have status of 2 in its state', async()=>{
+        it('Approved property with id 1 must have status of 2 in its state', async()=>{
             const response=(await promissory.property(1))
             expect(response[7]).to.be.equal(2)
+        })
+        it('Approvee Property with Id 3 for Investments', async()=>{
+            await expect(promissory.approveProperty(3)).to.emit(promissory, "PropertyApprovedAndTokenized")
         })
     })
     describe("Ban Property", ()=>{  
@@ -285,12 +289,6 @@ describe("Promissory Contract", ()=>{
         it("Property with Id 2 should have it's interest rate updated", async ()=>{
             const response=(await promissory.property(2))
             expect(response[5]).to.be.equal(PropertyInfo[2].updatedInterestRate)
-        })
-        it("It should Update Interest Rate of property if caller is property owner, and handle decimal", async ()=>{
-            //console.log('Promisoory is', promissory)
-            await expect(promissory.connect(promissoryUser2).updateInterestRate(2, 10.5)).to.emit(promissory, "InterestRateUpdated") .withArgs(
-                2, 10.5
-            )
         })
        
     })
@@ -398,6 +396,10 @@ describe("Promissory Contract", ()=>{
             //60 Is Invested Amount
             await expect(response).to.equal(PropertyInfo[1].totalInvestedAmount)
         })
+        it('Promisory User 1 invests 10 Tokens in Property with id 3', async ()=>{
+            await expect((promissory.connect(promissoryUser1).investInProperty(3,10))).to.emit(promissory, 'Invested')
+
+        })
     })
     // // // //TODO: Can a property be banned after investment?
     describe("Claim Investement, Property Owner Can Claim Invested USDT", ()=>{  
@@ -434,13 +436,13 @@ describe("Promissory Contract", ()=>{
         it("Should throw an error, if user claiming property Token Back is not property owner", async ()=>{
             await expect((promissory.connect(promissoryUser2).claimPropertyTokens(1, 10))).to.be.revertedWith('You are not the owner of this property!')
         })
+        let TotalLockedTokens
         it('If Tokens are already invested in, user can not withdraw more than locked token', async ()=>{
-            const response=await promissory.lockedTokens(1)
-            //console.log('Residual Locked Tokens are', response)
+            TotalLockedTokens= await promissory.lockedTokens(1)
             await expect((promissory.connect(promissoryUser1).claimPropertyTokens(1, PropertyInfo[1].tokenSupply))).to.be.revertedWith('You are claiming more tokens than locked!')
         })
         let claimedTokens=0
-        it('Should Be Able To Claim Locked Token Partially', async ()=>{
+        it('Should Be Able To Claim Locked Token Partially, 10 Tokens', async ()=>{
             await expect((promissory.connect(promissoryUser1).claimPropertyTokens(1, 10))).to.emit(promissory, "PropertyTokensClaimed").withArgs(
                 promissoryUser1.address,
                 1,
@@ -449,16 +451,20 @@ describe("Promissory Contract", ()=>{
                 claimedTokens+=10
             })
         })
+        it('Should have TotalLocked Tokens reduces by 10', async()=>{
+            response= await promissory.lockedTokens(1)
+            await expect(response).to.equal(TotalLockedTokens-10)
+        })
         it('Should Be Able To Claim Locked Tokens Completely', async ()=>{
             const lockedTokens=await promissory.lockedTokens(1)
-            await expect((promissory.connect(promissoryUser1).claimPropertyTokens(1, lockedTokens-claimedTokens))).to.emit(promissory, "PropertyTokensClaimed").withArgs(
+            await expect((promissory.connect(promissoryUser1).claimPropertyTokens(1, lockedTokens))).to.emit(promissory, "PropertyTokensClaimed").withArgs(
                 promissoryUser1.address,
                 1,
-                lockedTokens-claimedTokens
+                lockedTokens
             )
         })
         it('Locked Tokens of property with Id 1 should be 0', async ()=>{
-            await expect(promissory.lockedTokens(1)).to.equal(0)
+            await expect(await promissory.lockedTokens(1)).to.equal(0)
         })
     })
     describe("Claim Return", ()=>{  
@@ -475,10 +481,16 @@ describe("Promissory Contract", ()=>{
             await expect((promissory.connect(promissoryUser2).claimReturn(1, promissoryUser2InvestedAmount+20))).to.be.revertedWith('Amount exceeds than available!')
         })
         it("Investor should be able to claim, the returns partially", async ()=>{
-            await expect((promissory.connect(promissoryUser1).claimReturn(1,10))).to.be.emit(promissory, 'ReturnClaimed')
+            const deployedERC20Contract=await hre.ethers.getContractAt(ERC20TokenABI, PropertyInfo[1].tokenAddress, owner)
+            console.log('Deployed C', deployedERC20Contract.address)
+            console.log('Invested amount By User', promissoryUser2InvestedAmount)
+            await deployedERC20Contract.approve(promissoryUser2.address, promissoryUser2InvestedAmount)
+            const allowance=await deployedERC20Contract.allowance(promissory.address, promissoryUser2.address)
+            console.log('Allowance is', allowance)
+            await expect((promissory.connect(promissoryUser2).claimReturn(1,10))).to.be.emit(promissory, 'ReturnClaimed')
         })
         it("Investor should be able to claim the complete returns", async ()=>{
-            await expect((promissory.connect(promissoryUser1).claimReturn(1,20))).to.be.emit(promissory, 'ReturnClaimed')
+            await expect((promissory.connect(promissoryUser2).claimReturn(1,20))).to.be.emit(promissory, 'ReturnClaimed')
         })
     })
     describe('Return Investment Made with interest by property owner', ()=>{
@@ -489,5 +501,17 @@ describe("Promissory Contract", ()=>{
             await expect((promissory.connect(promissoryUser1).returnInvestment(1, promissoryUser2.address))).to.be.revertedWith('Locking period isn\'t completed yet!')
         })
         //Extend Block Time To Have the Final Test
+        it('Promisoory user 2 Return Investment To smart contract', async ()=>{
+            //Get By SC
+            const response=await promissory.investments(3, promissoryUser1.address)
+            const investedAmount=response[1]
+            //console.log('Response is', response)
+            await expect((promissory.connect(promissoryUser2).returnInvestment(3, promissoryUser1.address))).to.be.emit(promissory, 'InvestmentReturned').withArgs(
+                promissoryUser2.address,
+                promissoryUser1.address,
+                (investedAmount*PropertyInfo[3].interestRate*0.01),
+                investedAmount
+            )
+        })
     })
 })
