@@ -406,7 +406,7 @@ describe("Promissory Contract", ()=>{
         })
     })
     // // // //TODO: Can a property be banned after investment?
-    describe("Claim Investement, Property Owner Can Claim Invested USDT", ()=>{  
+    describe("Claim Investment, Property Owner Can Claim Invested USDT", ()=>{  
         it("Should throw an error, if user claiming investment is not property owner", async ()=>{
             await expect((promissory.connect(promissoryUser2).claimInvestment(1, 10))).to.be.revertedWith('You are not the onwer of this property!')
         })

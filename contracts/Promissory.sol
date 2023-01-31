@@ -208,8 +208,9 @@ contract Promissory{
 
         require(propertyIdToProperty[_propertyId].status == PropertyStatus.ADDED, "Property do not exist!!");
 
-        // Property memory userProperty;
-        // userProperty.status = PropertyStatus.BANNED;
+        Property storage propertyStatus = property[_propertyId];
+        propertyStatus.status = PropertyStatus.BANNED;
+
         propertyIdToProperty[_propertyId].status = PropertyStatus.BANNED;
 
         emit PropertyBanned(_propertyId, propertyIdToProperty[_propertyId].owner);
@@ -334,7 +335,8 @@ contract Promissory{
     function claimInvestment(uint256 _propertyId, uint256 _numberOfTokensToClaim) external {
 
         require(msg.sender == propertyIdToProperty[_propertyId].owner, "You are not the onwer of this property!");
-        require(_numberOfTokensToClaim <= totalInvestedAmount[_propertyId], "Amount exceeds than available!");
+        uint256 remainingInvetment = totalInvestedAmount[_propertyId] - claimedInvestment[_propertyId];
+        require(_numberOfTokensToClaim <= remainingInvetment, "Amount exceeds than available!");
 
         IERC20(USDT).approve(propertyIdToProperty[_propertyId].owner, _numberOfTokensToClaim);
         IERC20(USDT).transferFrom(address(this), propertyIdToProperty[_propertyId].owner, _numberOfTokensToClaim);
