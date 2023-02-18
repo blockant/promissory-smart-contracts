@@ -1,31 +1,31 @@
-require("@nomicfoundation/hardhat-toolbox");
-require("@nomicfoundation/hardhat-chai-matchers")
-require('@openzeppelin/hardhat-upgrades');
-/** @type import('hardhat/config').HardhatUserConfig */
-require("dotenv").config();
-require("@nomiclabs/hardhat-ethers");
+require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
-require("@nomiclabs/hardhat-web3");
+require('hardhat-contract-sizer');
+const dotenv = require("dotenv");
+dotenv.config({path: __dirname + '/.env'});
+const { ALCHEMY_API_KEY, POLYGON_PRIVATE_KEY, POLYGONSCAN_API_KEY} = process.env;
 
 module.exports = {
-  //defaultNetwork: "matic",
-  networks: {
-    hardhat: {},
-    // polygon_mumbai: {
-    //   url: "https://rpc-mumbai.maticvigil.com",
-    //   accounts: [process.env.PRIVATE_KEY],
-    // },
-  },
-  // etherscan: {
-  //   apiKey: process.env.POLYGONSCAN_API_KEY,
-  // },
+  defaultNetwork: "hardhat",
   solidity: {
-    version: "0.8.13",
+    version:"0.8.12",
     settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
+    optimizer: {
+      enabled: true,
+      runs: 20
     },
   },
-};
+},
+allowUnlimitedContractSize: 'true',
+  networks: {
+    mumbai: {
+      url: `https://polygon-mumbai.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      accounts: [POLYGON_PRIVATE_KEY]
+    }
+  },
+  etherscan: {
+    apiKey: {
+      polygonMumbai: POLYGONSCAN_API_KEY,
+    }
+  },
+}

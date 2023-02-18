@@ -126,9 +126,8 @@ contract Promissory{
     mapping (uint256 => uint256) public totalInvestedAmount;// invested amount in a property
     mapping (uint256 => uint256) public claimedInvestment;// claimed loan amount by owner of property
     mapping (uint256 => mapping (address => Investment)) public investments;// Mapping for storing investment information with tokenID and invetsor address
-    
-    
-    
+    mapping(uint256 => Investment[]) public propertyIdToInvestment;
+
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -137,25 +136,41 @@ contract Promissory{
     // / @param _promissoryOwner address of owner of the platform
     // / @param _USDT address of USDT token
     constructor(
-        address _promissoryOwner,
-        address _USDT
+        // address _promissoryOwner,
+        // address _USDT
     )
     {
         //confirming that no one can bypass using null
-        require(_promissoryOwner != address(0), "Zero(0x0) Promissory Owner address");
-        require(_USDT != address(0), "Zero(0x0) USDT address");
+        // require(_promissoryOwner != address(0), "Zero(0x0) Promissory Owner address");
+        // require(_USDT != address(0), "Zero(0x0) USDT address");
 
         //assigning params of constructor to declared addresses
-        // promissoryOwner = 0x78315cF7082dBb0174da3286D436BfE7577dF836;
-        // USDT = 0x2aC68A7Fa635972335d1d0880aa8861c5a46Bf88;
-        promissoryOwner=_promissoryOwner;
-        USDT=_USDT;
+        promissoryOwner = 0x78315cF7082dBb0174da3286D436BfE7577dF836;
+        USDT = 0x2aC68A7Fa635972335d1d0880aa8861c5a46Bf88;
+        // promissoryOwner=_promissoryOwner;
+        // USDT=_USDT;
     }
 
     /// @dev creating a modifier which will be used later for checks 
     modifier checkPromissoryOwner(){    
         if(msg.sender != promissoryOwner) revert("Caller is not the owner of the platform");
         _;
+    }
+
+    function getAllProperties() public view returns (Property[] memory) {
+        Property[] memory result = new Property[](_propertyIdCount.current());
+        uint256 i = 0;
+        for (uint256 propertyId = 0; propertyId <= _propertyIdCount.current(); propertyId++) {
+            if (property[propertyId].propertyId > 0) {
+                result[i] = property[propertyId];
+                i = i.add(1);
+            }
+        }
+        return result;
+    }
+
+    function getAllInvestments(uint256 _propertyId) public view returns (Investment[] memory) {
+        return propertyIdToInvestment[_propertyId];
     }
 
     /// @notice creates a new property
@@ -166,7 +181,6 @@ contract Promissory{
         uint256 _interestRate,
         uint256 _lockingPeriod
     ) external
-
     {   
         Property memory userProperty;
         userProperty.propertyId = _propertyIdCount.current();
@@ -321,12 +335,15 @@ contract Promissory{
         ERC20Token(propertyIdToTokenAddress[_propertyId]).transferFrom(address(this), msg.sender, _investmentAmount);
         lockedTokens[_propertyId] -= _investmentAmount;
 
+        uint256 timeNow = block.timestamp;
         investments[_propertyId][msg.sender] = Investment({
             investor: msg.sender,
             investmentAmount: _investmentAmount,
             // timeStamp: block.timestamp.div(86400)
-            timeStamp: block.timestamp
+            timeStamp: timeNow
         });
+        
+        propertyIdToInvestment[_propertyId].push(investments[_propertyId][msg.sender]);
 
         emit Invested(_propertyId, msg.sender, _investmentAmount, propertyIdToProperty[_propertyId].tokenSupply, propertyIdToProperty[_propertyId].interestRate);
     }

@@ -106,3 +106,12 @@ Now for property onwers to return investment:
 
 * It only allows to return investment with interest if the locking period is finished! \*
 * Transfers TestUSDT to Promissory Contract \*
+
+## Deployment steps
+1. `npx hardhat run scripts/deploy.js --network mumbai`
+2. `npx hardhat verify <contract_address> --network mumbai`
+
+## Stable contract addresses
+1. With getAllProperties: `https://mumbai.polygonscan.com/address/0xcffda51120B5C1a3a9268A62d7Fe8F55E2Fae5CC#writeContract`
+2. With getAllInvestments: `https://mumbai.polygonscan.com/address/0xC305B0A97b0c777559F01ac364b667B8ECA9488B#code`
+3. With constructor: `https://mumbai.polygonscan.com/address/0x88803A6B977eFfD33d6D5Fc032D9666Fde1D2E04#writeContract`
